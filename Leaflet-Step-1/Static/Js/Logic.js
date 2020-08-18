@@ -1,87 +1,71 @@
-// Create a map using Leaflet that plots all of the earthquakes from your data set based on their longitude and latitude.
-// Data markers should reflect the magnitude of the earthquake in their size and color (higher == larger | darker).
-// Include popups that provide context for map data.
+var queryUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson";
+// Perform a GET request to the query URL
+d3.json(queryUrl, function(data) {
+  // Once we get a response, send the data.features object to the createFeatures function
+  createFeatures(data.features);
+});
 
-// Create a map object
-let myMap = L.map('map', {
-    center: [15.5994, -28.6731],
-    zoom: 3
+function createFeatures(earthquakeData) {
+
+  // Define a function we want to run once for each feature in the features array
+  // Give each feature a popup describing the place and time of the earthquake
+  function onEachFeature(feature, layer) {
+    layer.bindPopup("<h3>" + feature.properties.place +
+      "</h3><hr><p>" + new Date(feature.properties.time) + "</p>");
+  }
+
+  // Create a GeoJSON layer containing the features array on the earthquakeData object
+  // Run the onEachFeature function once for each piece of data in the array
+  var earthquakes = L.geoJSON(earthquakeData, {
+    onEachFeature: onEachFeature
   });
 
-L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
-  attribution: "© <a href='https://www.mapbox.com/about/maps/'>Mapbox</a> © <a href='http://www.openstreetmap.org/copyright'>OpenStreetMap</a> <strong><a href='https://www.mapbox.com/map-feedback/' target='_blank'>Improve this map</a></strong>",
-  tileSize: 512,
-  maxZoom: 18,
-  zoomOffset: -1,
-  id: "mapbox/light-v10",
-  accessToken: APIkey
-}).addTo(myMap);
+  // Sending our earthquakes layer to the createMap function
+  createMap(earthquakes);
+}
 
-// Get data set from USGS
-// Store API query variables past 30 days All Earthquakes
-let baseURL = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson'
-// Grab the data with d3
-d3.json(baseURL,function(data){
-// Set the data earthquakes properties to a variable
-    let earthquakes = data.features;
-// Loop through data anc check for earthquake magnitude property and set markers color according to intervals (0-1,1-2,2-3,3-4,4-5,5+)
-    for (let i = 0; i < earthquakes.length; i++) {
-// Conditionals for earthquake magnitude points
-    let color = '';
-    if (earthquakes[i].properties.mag <= 1) {
-      color = '#00CC99';
-    }
-    else if (earthquakes[i].properties.mag <= 2) {
-      color = '#00FF99';
-    }
-    else if (earthquakes[i].properties.mag <= 3) {
-        color = '#FFFF99';
-    }
-    else if (earthquakes[i].properties.mag <= 4) {
-        color = '#FFFF33';
-      }
-    else if (earthquakes[i].properties.mag <= 5) {
-        color = '#FF9900';
-      }
-    else {
-      color = '#FF6600';
-    }
-// Add circles to map according to geometry coordinates
-  L.circle([earthquakes[i].geometry.coordinates[1],earthquakes[i].geometry.coordinates[0]], {
-    fillOpacity: 0.75,
-    color: '',
-    fillColor: color,
-// Adjust radius of circle according to magnitude
-    radius: earthquakes[i].properties.mag * 10000
-// Include popups that provide magnitude and place.
-  }).bindPopup("<h1>" + earthquakes[i].properties.place + "</h1> <hr> <h2>Magnitude: " + earthquakes[i].properties.mag + "</h2>").addTo(myMap);
-}
-// Include legend control to show earthquake intervals
-function magcolor(mag) {
-  if (mag <= 1) {
-      return "#00CC99";
-  } else if (mag <= 2) {
-      return "#00FF99";
-  } else if (mag <= 3) {
-      return "#FFFF99";
-  } else if (mag <= 4) {
-      return "#FFFF33";
-  } else if (mag <= 5) {
-      return "#FF9900";
-  } else {
-      return "#FF6600";
+
+function createMap(earthquakes) {
+
+  // Define streetmap and darkmap layers
+  var streetmap = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+    attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+    maxZoom: 18,
+    id: 'mapbox/streets-v11',
+    accessToken: API_KEY
+  });
+
+  var darkmap = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+    attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+    maxZoom: 18,
+    id: "mapbox.dark",
+    accessToken: API_KEY
+  });
+
+  // Define a baseMaps object to hold our base layers
+  var baseMaps = {
+    "Street Map": streetmap,
+    "Dark Map": darkmap
   };
+
+  // Create overlay object to hold our overlay layer
+  var overlayMaps = {
+    Earthquakes: earthquakes
+  };
+
+  // Create our map, giving it the streetmap and earthquakes layers to display on load
+  var myMap = L.map("map", {
+    center: [
+      37.09, -95.71
+    ],
+    zoom: 5,
+    layers: [streetmap, earthquakes]
+  });
+
+  // Create a layer control
+  // Pass in our baseMaps and overlayMaps
+  // Add the layer control to the map
+  L.control.layers(baseMaps, overlayMaps, {
+    collapsed: false
+  }).addTo(myMap);
 }
-let legend = L.control({position: 'bottomright'});
-legend.onAdd = function () {
-    let div = L.DomUtil.create('div', 'info legend');
-    let intervals = [0,1,2,3,4,5];
-// Loop through magnitude intervals and generate a label with the colored square for each interval
-  for(let i = 0; i < intervals.length; i++){
-    div.innerHTML += '<i style="background:' + magcolor(intervals[i] + 1) + '"></i> ' + 
-    + intervals[i] + (intervals[i + 1] ? ' - ' + intervals[i + 1] + '<br>' : ' + ');
-  }
-return div;
-};
-legend.addTo(myMap);
-});
